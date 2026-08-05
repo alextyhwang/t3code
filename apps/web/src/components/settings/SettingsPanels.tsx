@@ -104,6 +104,7 @@ import {
 } from "./settingsLayout";
 import { ProjectFavicon } from "../ProjectFavicon";
 import { useAtomCommand } from "../../state/use-atom-command";
+import { useEnvironmentQuery } from "../../state/query";
 
 const THEME_OPTIONS = [
   {
@@ -1181,6 +1182,21 @@ export function ProviderSettingsPanel() {
   const updateProvider = useAtomCommand(serverEnvironment.updateProvider, {
     reportFailure: false,
   });
+  const runCodexHistorySync = useAtomCommand(serverEnvironment.runCodexHistorySync, {
+    reportFailure: false,
+  });
+  const environmentId = primaryEnvironment?.environmentId ?? null;
+  const {
+    data: codexHistoryStatus,
+    error: codexHistoryStatusError,
+    isPending: isCodexHistoryStatusPending,
+    refresh: refreshCodexHistoryStatus,
+  } = useEnvironmentQuery(
+    environmentId === null
+      ? null
+      : serverEnvironment.codexHistorySyncStatus({ environmentId, input: {} }),
+  );
+  const [isRunningCodexHistorySync, setIsRunningCodexHistorySync] = useState(false);
   const [isRefreshingProviders, setIsRefreshingProviders] = useState(false);
   const [isAddInstanceDialogOpen, setIsAddInstanceDialogOpen] = useState(false);
   const [updatingProviderDrivers, setUpdatingProviderDrivers] = useState<
@@ -1188,6 +1204,31 @@ export function ProviderSettingsPanel() {
   >(() => new Set());
   const [openInstanceDetails, setOpenInstanceDetails] = useState<Record<string, boolean>>({});
   const refreshingRef = useRef(false);
+
+  const runHistorySync = useCallback(() => {
+    if (!primaryEnvironment || isRunningCodexHistorySync) return;
+    setIsRunningCodexHistorySync(true);
+    void runCodexHistorySync({
+      environmentId: primaryEnvironment.environmentId,
+      input: {},
+    }).then((result) => {
+      setIsRunningCodexHistorySync(false);
+      refreshCodexHistoryStatus();
+      if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
+        const error = squashAtomCommandFailure(result);
+        toastManager.add({
+          type: "error",
+          title: "Codex history sync failed",
+          description: error instanceof Error ? error.message : "An error occurred.",
+        });
+      }
+    });
+  }, [
+    isRunningCodexHistorySync,
+    primaryEnvironment,
+    refreshCodexHistoryStatus,
+    runCodexHistorySync,
+  ]);
 
   const providerUpdateCandidates = useMemo(
     () => collectProviderUpdateCandidates(serverProviders),
@@ -1463,6 +1504,114 @@ export function ProviderSettingsPanel() {
 
   return (
     <SettingsPageContainer>
+      <SettingsSection title="Codex history sync">
+        <SettingsRow
+          title="Automatic history sync"
+          description="Discover Codex tasks and keep their transcript, title, and archive state synchronized."
+          control={
+            <Switch
+              checked={settings.codexHistorySync.enabled}
+              onCheckedChange={(checked) =>
+                updateSettings({
+                  codexHistorySync: {
+                    ...settings.codexHistorySync,
+                    enabled: Boolean(checked),
+                  },
+                })
+              }
+              aria-label="Enable automatic Codex history sync"
+            />
+          }
+        />
+        <SettingsRow
+          title="Discovery scope"
+          description="Known projects limits discovery to folders already in T3 Code. All folders creates imported project entries."
+          control={
+            <Select
+              value={settings.codexHistorySync.discoveryScope}
+              onValueChange={(value) => {
+                if (value !== "known-projects" && value !== "all") return;
+                updateSettings({
+                  codexHistorySync: {
+                    ...settings.codexHistorySync,
+                    discoveryScope: value,
+                  },
+                });
+              }}
+            >
+              <SelectTrigger className="w-full sm:w-40" aria-label="Codex history discovery scope">
+                <SelectValue>
+                  {settings.codexHistorySync.discoveryScope === "all"
+                    ? "All folders"
+                    : "Known projects"}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectPopup align="end" alignItemWithTrigger={false}>
+                <SelectItem hideIndicator value="known-projects">
+                  Known projects
+                </SelectItem>
+                <SelectItem hideIndicator value="all">
+                  All folders
+                </SelectItem>
+              </SelectPopup>
+            </Select>
+          }
+        />
+        <SettingsRow
+          title="Sync interval"
+          description="Polling interval in seconds (5–3600)."
+          control={
+            <DraftInput
+              className="w-24"
+              type="number"
+              min={5}
+              max={3600}
+              value={String(settings.codexHistorySync.intervalSeconds)}
+              onCommit={(raw) => {
+                const value = Number.parseInt(raw, 10);
+                if (!Number.isFinite(value)) return;
+                updateSettings({
+                  codexHistorySync: {
+                    ...settings.codexHistorySync,
+                    intervalSeconds: Math.max(5, Math.min(3600, value)),
+                  },
+                });
+              }}
+              aria-label="Codex history synchronization interval in seconds"
+            />
+          }
+        />
+        <SettingsRow
+          title="Synchronization status"
+          description={
+            codexHistoryStatusError ??
+            codexHistoryStatus?.error ??
+            (codexHistoryStatus
+              ? `${codexHistoryStatus.state} · ${codexHistoryStatus.counts.discovered} discovered · ${codexHistoryStatus.counts.updated} updated`
+              : "Status has not loaded yet.")
+          }
+          control={
+            <Button
+              size="xs"
+              variant="outline"
+              disabled={
+                !settings.codexHistorySync.enabled ||
+                isRunningCodexHistorySync ||
+                isCodexHistoryStatusPending
+              }
+              onClick={runHistorySync}
+            >
+              {isRunningCodexHistorySync ? (
+                <LoaderIcon className="size-3 animate-spin" />
+              ) : (
+                <RefreshCwIcon className="size-3" />
+              )}
+              Sync now
+            </Button>
+          }
+        />
+      </SettingsSection>
+
       <SettingsSection
         title="Providers"
         headerAction={

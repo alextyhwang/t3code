@@ -293,7 +293,28 @@ export const staticAndDevRouteLayer = HttpRouter.add(
     }
 
     const contentType = Mime.getType(filePath) ?? "application/octet-stream";
-    const data = yield* fileSystem.readFile(filePath).pipe(Effect.orElseSucceed(() => null));
+    const acceptedEncodings = request.headers["accept-encoding"] ?? "";
+    const compressedExtension = acceptedEncodings.includes("br")
+      ? ".br"
+      : acceptedEncodings.includes("gzip")
+        ? ".gz"
+        : undefined;
+    let responseFilePath = filePath;
+    let contentEncoding: "br" | "gzip" | undefined;
+    if (compressedExtension) {
+      const compressedPath = `${filePath}${compressedExtension}`;
+      const compressedInfo = yield* fileSystem
+        .stat(compressedPath)
+        .pipe(Effect.orElseSucceed(() => null));
+      if (compressedInfo?.type === "File") {
+        responseFilePath = compressedPath;
+        contentEncoding = compressedExtension === ".br" ? "br" : "gzip";
+      }
+    }
+
+    const data = yield* fileSystem
+      .readFile(responseFilePath)
+      .pipe(Effect.orElseSucceed(() => null));
     if (!data) {
       return HttpServerResponse.text("Internal Server Error", { status: 500 });
     }
@@ -301,6 +322,10 @@ export const staticAndDevRouteLayer = HttpRouter.add(
     return HttpServerResponse.uint8Array(data, {
       status: 200,
       contentType,
+      headers: {
+        ...(contentEncoding ? { "content-encoding": contentEncoding } : {}),
+        vary: "Accept-Encoding",
+      },
     });
   }),
 );

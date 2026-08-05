@@ -34,6 +34,7 @@ import type * as TextGeneration from "../textGeneration/TextGeneration.ts";
 import type { ProviderAdapterError, ProviderDriverError } from "./Errors.ts";
 import type { ProviderAdapterShape } from "./Services/ProviderAdapter.ts";
 import type { ServerProviderShape } from "./Services/ServerProvider.ts";
+import type { ProviderHistoryAdapterShape } from "./Services/ProviderHistory.ts";
 
 /**
  * Static metadata advertised by a driver. Used for default presentation
@@ -71,6 +72,7 @@ export interface ProviderInstance {
   readonly snapshot: ServerProviderShape;
   readonly adapter: ProviderAdapterShape<ProviderAdapterError>;
   readonly textGeneration: TextGeneration.TextGeneration["Service"];
+  readonly history?: ProviderHistoryAdapterShape;
 }
 
 export interface ProviderContinuationIdentity {

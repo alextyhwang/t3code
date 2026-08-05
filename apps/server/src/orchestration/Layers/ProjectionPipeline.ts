@@ -784,6 +784,7 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
         case "thread.message-sent":
         case "thread.proposed-plan-upserted":
         case "thread.activity-appended":
+        case "thread.provider-history-pruned":
         case "thread.approval-response-requested":
         case "thread.user-input-response-requested": {
           const existingRow = yield* projectionThreadRepository.getById({
@@ -916,6 +917,14 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
           return;
         }
 
+        case "thread.provider-history-pruned":
+          yield* Effect.forEach(
+            event.payload.messageIds,
+            (messageId) => projectionThreadMessageRepository.deleteByMessageId({ messageId }),
+            { concurrency: 1, discard: true },
+          );
+          return;
+
         case "thread.reverted": {
           const existingRows = yield* projectionThreadMessageRepository.listByThreadId({
             threadId: event.payload.threadId,
@@ -971,6 +980,14 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
           });
           return;
 
+        case "thread.provider-history-pruned":
+          yield* Effect.forEach(
+            event.payload.proposedPlanIds,
+            (planId) => projectionThreadProposedPlanRepository.deleteByPlanId({ planId }),
+            { concurrency: 1, discard: true },
+          );
+          return;
+
         case "thread.reverted": {
           const existingRows = yield* projectionThreadProposedPlanRepository.listByThreadId({
             threadId: event.payload.threadId,
@@ -1023,6 +1040,14 @@ const makeOrchestrationProjectionPipeline = Effect.fn("makeOrchestrationProjecti
               : {}),
             createdAt: event.payload.activity.createdAt,
           });
+          return;
+
+        case "thread.provider-history-pruned":
+          yield* Effect.forEach(
+            event.payload.activityIds,
+            (activityId) => projectionThreadActivityRepository.deleteByActivityId({ activityId }),
+            { concurrency: 1, discard: true },
+          );
           return;
 
         case "thread.reverted": {

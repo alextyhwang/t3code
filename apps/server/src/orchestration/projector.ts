@@ -21,6 +21,7 @@ import {
   ThreadInteractionModeSetPayload,
   ThreadMetaUpdatedPayload,
   ThreadProposedPlanUpsertedPayload,
+  ThreadProviderHistoryPrunedPayload,
   ThreadRuntimeModeSetPayload,
   ThreadSettledPayload,
   ThreadSnoozedPayload,
@@ -742,6 +743,38 @@ export function projectEvent(
             ...nextBase,
             threads: updateThread(nextBase.threads, payload.threadId, {
               activities,
+              updatedAt: event.occurredAt,
+            }),
+          };
+        }),
+      );
+
+    case "thread.provider-history-pruned":
+      return decodeForEvent(
+        ThreadProviderHistoryPrunedPayload,
+        event.payload,
+        event.type,
+        "payload",
+      ).pipe(
+        Effect.map((payload) => {
+          const messageIds = new Set(payload.messageIds);
+          const planIds = new Set(payload.proposedPlanIds);
+          const activityIds = new Set(payload.activityIds);
+          return {
+            ...nextBase,
+            threads: updateThread(nextBase.threads, payload.threadId, {
+              messages:
+                nextBase.threads
+                  .find((thread) => thread.id === payload.threadId)
+                  ?.messages.filter((message) => !messageIds.has(message.id)) ?? [],
+              proposedPlans:
+                nextBase.threads
+                  .find((thread) => thread.id === payload.threadId)
+                  ?.proposedPlans.filter((plan) => !planIds.has(plan.id)) ?? [],
+              activities:
+                nextBase.threads
+                  .find((thread) => thread.id === payload.threadId)
+                  ?.activities.filter((activity) => !activityIds.has(activity.id)) ?? [],
               updatedAt: event.occurredAt,
             }),
           };

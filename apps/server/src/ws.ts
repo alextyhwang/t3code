@@ -22,6 +22,7 @@ import {
   type AuthEnvironmentScope,
   AuthSessionId,
   CommandId,
+  CodexHistorySyncError,
   type DiscoveredLocalServerList,
   EventId,
   type OrchestrationCommand,
@@ -86,6 +87,7 @@ import * as ServerSelfUpdate from "./cloud/selfUpdate.ts";
 import * as ServerLifecycleEvents from "./serverLifecycleEvents.ts";
 import * as ServerRuntimeStartup from "./serverRuntimeStartup.ts";
 import * as ServerSettings from "./serverSettings.ts";
+import * as CodexHistory from "./codexHistorySync.ts";
 import * as TerminalManager from "./terminal/Manager.ts";
 import * as PreviewAutomationBroker from "./mcp/PreviewAutomationBroker.ts";
 import * as PreviewManager from "./preview/Manager.ts";
@@ -315,6 +317,8 @@ const RPC_REQUIRED_SCOPE = new Map<string, AuthEnvironmentScope>([
   [WS_METHODS.serverRemoveKeybinding, AuthOrchestrationOperateScope],
   [WS_METHODS.serverGetSettings, AuthOrchestrationReadScope],
   [WS_METHODS.serverUpdateSettings, AuthOrchestrationOperateScope],
+  [WS_METHODS.codexHistorySyncRun, AuthOrchestrationOperateScope],
+  [WS_METHODS.codexHistorySyncStatus, AuthOrchestrationReadScope],
   [WS_METHODS.serverDiscoverSourceControl, AuthOrchestrationReadScope],
   [WS_METHODS.serverGetTraceDiagnostics, AuthOrchestrationReadScope],
   [WS_METHODS.serverGetProcessDiagnostics, AuthOrchestrationReadScope],
@@ -437,6 +441,7 @@ const makeWsRpcLayer = (
       const config = yield* ServerConfig.ServerConfig;
       const lifecycleEvents = yield* ServerLifecycleEvents.ServerLifecycleEvents;
       const serverSettings = yield* ServerSettings.ServerSettingsService;
+      const codexHistorySync = yield* Effect.serviceOption(CodexHistory.CodexHistorySync);
       const startup = yield* ServerRuntimeStartup.ServerRuntimeStartup;
       const workspaceEntries = yield* WorkspaceEntries.WorkspaceEntries;
       const workspaceFileSystem = yield* WorkspaceFileSystem.WorkspaceFileSystem;
@@ -1126,6 +1131,12 @@ const makeWsRpcLayer = (
             ORCHESTRATION_WS_METHODS.dispatchCommand,
             Effect.gen(function* () {
               const normalizedCommand = yield* normalizeDispatchCommand(command);
+              if (
+                normalizedCommand.type === "thread.turn.start" &&
+                Option.isSome(codexHistorySync)
+              ) {
+                yield* codexHistorySync.value.assertCanSend(normalizedCommand.threadId);
+              }
               const shouldStopSessionAfterArchive =
                 normalizedCommand.type === "thread.archive"
                   ? yield* projectionSnapshotQuery
@@ -1539,6 +1550,40 @@ const makeWsRpcLayer = (
             {
               "rpc.aggregate": "server",
             },
+          ),
+        [WS_METHODS.codexHistorySyncRun]: (_input) =>
+          observeRpcEffect(
+            WS_METHODS.codexHistorySyncRun,
+            Option.isSome(codexHistorySync)
+              ? codexHistorySync.value.run
+              : Effect.fail(
+                  new CodexHistorySyncError({
+                    operation: "run",
+                    message: "Codex history synchronization is unavailable in this runtime.",
+                  }),
+                ),
+            { "rpc.aggregate": "codexHistorySync" },
+          ),
+        [WS_METHODS.codexHistorySyncStatus]: (_input) =>
+          observeRpcEffect(
+            WS_METHODS.codexHistorySyncStatus,
+            Option.isSome(codexHistorySync)
+              ? codexHistorySync.value.getStatus
+              : Effect.succeed({
+                  state: "disabled" as const,
+                  lastRunAt: null,
+                  nextRunAt: null,
+                  counts: {
+                    discovered: 0,
+                    imported: 0,
+                    updated: 0,
+                    skipped: 0,
+                    conflicts: 0,
+                  },
+                  error: null,
+                  threads: [],
+                }),
+            { "rpc.aggregate": "codexHistorySync" },
           ),
         [WS_METHODS.serverDiscoverSourceControl]: (_input) =>
           observeRpcEffect(

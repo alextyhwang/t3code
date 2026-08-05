@@ -298,6 +298,10 @@ export function createServerEnvironmentAtoms<R, E>(
       label: "environment-data:server:process-resource-history",
       tag: WS_METHODS.serverGetProcessResourceHistory,
     }),
+    codexHistorySyncStatus: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:server:codex-history-sync-status",
+      tag: WS_METHODS.codexHistorySyncStatus,
+    }),
     configProjection,
     welcome: createEnvironmentRpcSubscriptionAtomFamily(runtime, {
       label: "environment-data:server:welcome",
@@ -344,6 +348,14 @@ export function createServerEnvironmentAtoms<R, E>(
       tag: WS_METHODS.serverUpdateSettings,
       scheduler: configScheduler,
       concurrency: configConcurrency,
+    }),
+    runCodexHistorySync: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:server:codex-history-sync-run",
+      tag: WS_METHODS.codexHistorySyncRun,
+      concurrency: {
+        mode: "singleFlight",
+        key: ({ environmentId }) => environmentId,
+      },
     }),
     signalProcess: createEnvironmentRpcCommand(runtime, {
       label: "environment-data:server:signal-process",

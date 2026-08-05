@@ -43,6 +43,8 @@ export const DeleteProjectionThreadActivitiesInput = Schema.Struct({
 });
 export type DeleteProjectionThreadActivitiesInput =
   typeof DeleteProjectionThreadActivitiesInput.Type;
+export const DeleteProjectionThreadActivityInput = Schema.Struct({ activityId: EventId });
+export type DeleteProjectionThreadActivityInput = typeof DeleteProjectionThreadActivityInput.Type;
 
 /**
  * ProjectionThreadActivityRepositoryShape - Service API for projected thread activity.
@@ -72,6 +74,9 @@ export interface ProjectionThreadActivityRepositoryShape {
    */
   readonly deleteByThreadId: (
     input: DeleteProjectionThreadActivitiesInput,
+  ) => Effect.Effect<void, ProjectionRepositoryError>;
+  readonly deleteByActivityId: (
+    input: DeleteProjectionThreadActivityInput,
   ) => Effect.Effect<void, ProjectionRepositoryError>;
 }
 

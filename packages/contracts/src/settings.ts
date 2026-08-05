@@ -427,6 +427,20 @@ export type SourceControlWritingStyleSettings = typeof SourceControlWritingStyle
 
 export const DEFAULT_AUTOMATIC_GIT_FETCH_INTERVAL = Duration.seconds(30);
 
+export const CodexHistorySyncDiscoveryScope = Schema.Literals(["known-projects", "all"]);
+export type CodexHistorySyncDiscoveryScope = typeof CodexHistorySyncDiscoveryScope.Type;
+
+export const CodexHistorySyncSettings = Schema.Struct({
+  enabled: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
+  discoveryScope: CodexHistorySyncDiscoveryScope.pipe(
+    Schema.withDecodingDefault(Effect.succeed("known-projects" as const)),
+  ),
+  intervalSeconds: Schema.Int.check(Schema.isBetween({ minimum: 5, maximum: 3_600 })).pipe(
+    Schema.withDecodingDefault(Effect.succeed(15)),
+  ),
+});
+export type CodexHistorySyncSettings = typeof CodexHistorySyncSettings.Type;
+
 export const ServerSettings = Schema.Struct({
   enableAssistantStreaming: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),
   enableProviderUpdateChecks: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(true))),
@@ -442,6 +456,7 @@ export const ServerSettings = Schema.Struct({
     Schema.withDecodingDefault(Effect.succeed(true)),
   ),
   addProjectBaseDirectory: TrimmedString.pipe(Schema.withDecodingDefault(Effect.succeed(""))),
+  codexHistorySync: CodexHistorySyncSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
   textGenerationModelSelection: ModelSelection.pipe(
     Schema.withDecodingDefault(
       Effect.succeed({
@@ -580,6 +595,15 @@ export const ServerSettingsPatch = Schema.Struct({
   defaultThreadEnvMode: Schema.optionalKey(ThreadEnvMode),
   newWorktreesStartFromOrigin: Schema.optionalKey(Schema.Boolean),
   addProjectBaseDirectory: Schema.optionalKey(TrimmedString),
+  codexHistorySync: Schema.optionalKey(
+    Schema.Struct({
+      enabled: Schema.optionalKey(Schema.Boolean),
+      discoveryScope: Schema.optionalKey(CodexHistorySyncDiscoveryScope),
+      intervalSeconds: Schema.optionalKey(
+        Schema.Int.check(Schema.isBetween({ minimum: 5, maximum: 3_600 })),
+      ),
+    }),
+  ),
   textGenerationModelSelection: Schema.optionalKey(ModelSelectionPatch),
   sourceControlWritingStyle: Schema.optionalKey(
     Schema.Struct({

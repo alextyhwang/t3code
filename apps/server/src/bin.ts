@@ -1,5 +1,6 @@
 import * as NodeRuntime from "@effect/platform-node/NodeRuntime";
 import * as NodeServices from "@effect/platform-node/NodeServices";
+import * as DateTime from "effect/DateTime";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import { Argument, Command } from "effect/unstable/cli";
@@ -57,7 +58,24 @@ export const makeCli = ({ cloudEnabled = hasCloudPublicConfig } = {}) =>
 
 export const cli = makeCli();
 
+export const isRecoverableSocketReset = (error: unknown): boolean =>
+  error instanceof Error &&
+  "code" in error &&
+  (error as Error & { readonly code?: unknown }).code === "ECONNRESET";
+
+const handleUncaughtException = (error: unknown): void => {
+  if (isRecoverableSocketReset(error)) {
+    process.stderr.write(
+      `[${DateTime.formatIso(DateTime.nowUnsafe())}] WARN Ignored recoverable socket reset; T3 remains online.\n`,
+    );
+    return;
+  }
+  process.removeListener("uncaughtException", handleUncaughtException);
+  throw error;
+};
+
 if (import.meta.main) {
+  process.on("uncaughtException", handleUncaughtException);
   Command.run(cli, { version: packageJson.version }).pipe(
     Effect.scoped,
     Effect.provide(CliRuntimeLayer),

@@ -20,6 +20,8 @@ import * as ServerLifecycleEvents from "./serverLifecycleEvents.ts";
 import * as AnalyticsService from "./telemetry/AnalyticsService.ts";
 import { ProviderSessionDirectoryLive } from "./provider/Layers/ProviderSessionDirectory.ts";
 import * as ProviderSessionRuntime from "./persistence/ProviderSessionRuntime.ts";
+import { ProviderHistoryRepositoryLive } from "./persistence/Layers/ProviderHistory.ts";
+import * as CodexHistorySync from "./codexHistorySync.ts";
 import { ProviderAdapterRegistryLive } from "./provider/Layers/ProviderAdapterRegistry.ts";
 import * as ProviderEventLoggers from "./provider/Layers/ProviderEventLoggers.ts";
 import { ProviderServiceLive } from "./provider/Layers/ProviderService.ts";
@@ -291,7 +293,12 @@ const ProviderRuntimeLayerLive = ProviderSessionReaperLive.pipe(
   Layer.provideMerge(OrchestrationLayerLive),
 );
 
-const RuntimeCoreDependenciesLive = ReactorLayerLive.pipe(
+const CodexHistorySyncLayerLive = CodexHistorySync.layer.pipe(
+  Layer.provideMerge(ProviderHistoryRepositoryLive),
+  Layer.provideMerge(ProviderSessionRuntime.layer),
+);
+
+const RuntimeCoreDependenciesBaseLive = ReactorLayerLive.pipe(
   // Core Services
   Layer.provideMerge(CheckpointingLayerLive),
   Layer.provideMerge(SourceControlProviderRegistryLayerLive),
@@ -336,6 +343,11 @@ const RuntimeCoreDependenciesLive = ReactorLayerLive.pipe(
       CloudManagedEndpointRuntimeLive,
     ),
   ),
+);
+
+const RuntimeCoreDependenciesLive = Layer.merge(
+  RuntimeCoreDependenciesBaseLive,
+  CodexHistorySyncLayerLive.pipe(Layer.provide(RuntimeCoreDependenciesBaseLive)),
 );
 
 const RuntimeDependenciesLive = RuntimeCoreDependenciesLive.pipe(

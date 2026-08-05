@@ -34,6 +34,11 @@ export const DeleteProjectionThreadProposedPlansInput = Schema.Struct({
 });
 export type DeleteProjectionThreadProposedPlansInput =
   typeof DeleteProjectionThreadProposedPlansInput.Type;
+export const DeleteProjectionThreadProposedPlanInput = Schema.Struct({
+  planId: OrchestrationProposedPlanId,
+});
+export type DeleteProjectionThreadProposedPlanInput =
+  typeof DeleteProjectionThreadProposedPlanInput.Type;
 
 export interface ProjectionThreadProposedPlanRepositoryShape {
   readonly upsert: (
@@ -44,6 +49,9 @@ export interface ProjectionThreadProposedPlanRepositoryShape {
   ) => Effect.Effect<ReadonlyArray<ProjectionThreadProposedPlan>, ProjectionRepositoryError>;
   readonly deleteByThreadId: (
     input: DeleteProjectionThreadProposedPlansInput,
+  ) => Effect.Effect<void, ProjectionRepositoryError>;
+  readonly deleteByPlanId: (
+    input: DeleteProjectionThreadProposedPlanInput,
   ) => Effect.Effect<void, ProjectionRepositoryError>;
 }
 

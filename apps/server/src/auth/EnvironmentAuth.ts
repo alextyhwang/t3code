@@ -561,6 +561,22 @@ export const make = Effect.gen(function* () {
   const secretStore = yield* ServerSecretStore.ServerSecretStore;
   const crypto = yield* Crypto.Crypto;
   const descriptor = yield* policy.getDescriptor();
+  const trustedLoopbackBrowserSession =
+    process.env.T3CODE_TRUST_LOOPBACK_BROWSER === "1"
+      ? yield* sessions
+          .issue({
+            method: "bearer-access-token",
+            subject: "trusted-loopback-browser",
+            scopes: AuthAdministrativeScopes,
+            client: {
+              label: "Tailnet trusted browser",
+              deviceType: "bot",
+            },
+            ttl: Duration.days(3650),
+          })
+          .pipe(Effect.orDie)
+      : undefined;
+  const trustedLoopbackBrowserToken = trustedLoopbackBrowserSession?.token;
 
   const authenticateToken = (
     token: string,
@@ -595,7 +611,7 @@ export const make = Effect.gen(function* () {
     const cookieToken = request.cookies[sessions.cookieName];
     const bearerToken = parseBearerToken(request);
     const dpopToken = parseDpopToken(request);
-    const credential = cookieToken ?? bearerToken ?? dpopToken;
+    const credential = cookieToken ?? bearerToken ?? dpopToken ?? trustedLoopbackBrowserToken;
     if (!credential) {
       return Effect.fail(new ServerAuthMissingCredentialError({}));
     }

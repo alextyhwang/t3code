@@ -25,7 +25,7 @@ import * as CliError from "effect/unstable/cli/CliError";
 import * as TestConsole from "effect/testing/TestConsole";
 import { Command } from "effect/unstable/cli";
 
-import { cli, makeCli } from "./bin.ts";
+import { cli, isRecoverableSocketReset, makeCli } from "./bin.ts";
 import * as ServerConfig from "./config.ts";
 import * as ProjectionSnapshotQuery from "./orchestration/Services/ProjectionSnapshotQuery.ts";
 import * as OrchestrationEngine from "./orchestration/Services/OrchestrationEngine.ts";
@@ -161,6 +161,16 @@ const withLiveProjectCliServer = <A, E, R>(baseDir: string, run: () => Effect.Ef
   });
 
 it.layer(NodeServices.layer)("bin cli parsing", (it) => {
+  it.effect("recognizes recoverable socket resets without swallowing other failures", () =>
+    Effect.sync(() => {
+      assert.isTrue(
+        isRecoverableSocketReset(Object.assign(new Error("reset"), { code: "ECONNRESET" })),
+      );
+      assert.isFalse(isRecoverableSocketReset(Object.assign(new Error("pipe"), { code: "EPIPE" })));
+      assert.isFalse(isRecoverableSocketReset(new Error("ordinary failure")));
+    }),
+  );
+
   it.effect("accepts the built-in lowercase log-level flag values", () =>
     runCliWithRuntime(["--log-level", "debug", "--version"]),
   );

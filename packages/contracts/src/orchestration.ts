@@ -822,6 +822,28 @@ const ThreadMessageAssistantCompleteCommand = Schema.Struct({
   createdAt: IsoDateTime,
 });
 
+const ThreadMessageImportCommand = Schema.Struct({
+  type: Schema.Literal("thread.message.import"),
+  commandId: CommandId,
+  threadId: ThreadId,
+  messageId: MessageId,
+  role: OrchestrationMessageRole,
+  text: Schema.String,
+  turnId: Schema.optional(TurnId),
+  createdAt: IsoDateTime,
+  updatedAt: IsoDateTime,
+});
+
+const ThreadProviderHistoryPruneCommand = Schema.Struct({
+  type: Schema.Literal("thread.provider-history.prune"),
+  commandId: CommandId,
+  threadId: ThreadId,
+  messageIds: Schema.Array(MessageId),
+  proposedPlanIds: Schema.Array(OrchestrationProposedPlanId),
+  activityIds: Schema.Array(EventId),
+  createdAt: IsoDateTime,
+});
+
 const ThreadProposedPlanUpsertCommand = Schema.Struct({
   type: Schema.Literal("thread.proposed-plan.upsert"),
   commandId: CommandId,
@@ -864,6 +886,8 @@ const InternalOrchestrationCommand = Schema.Union([
   ThreadSessionSetCommand,
   ThreadMessageAssistantDeltaCommand,
   ThreadMessageAssistantCompleteCommand,
+  ThreadMessageImportCommand,
+  ThreadProviderHistoryPruneCommand,
   ThreadProposedPlanUpsertCommand,
   ThreadTurnDiffCompleteCommand,
   ThreadActivityAppendCommand,
@@ -904,6 +928,7 @@ export const OrchestrationEventType = Schema.Literals([
   "thread.proposed-plan-upserted",
   "thread.turn-diff-completed",
   "thread.activity-appended",
+  "thread.provider-history-pruned",
 ]);
 export type OrchestrationEventType = typeof OrchestrationEventType.Type;
 
@@ -1107,6 +1132,13 @@ export const ThreadActivityAppendedPayload = Schema.Struct({
   activity: OrchestrationThreadActivity,
 });
 
+export const ThreadProviderHistoryPrunedPayload = Schema.Struct({
+  threadId: ThreadId,
+  messageIds: Schema.Array(MessageId),
+  proposedPlanIds: Schema.Array(OrchestrationProposedPlanId),
+  activityIds: Schema.Array(EventId),
+});
+
 export const OrchestrationEventMetadata = Schema.Struct({
   providerTurnId: Schema.optional(TrimmedNonEmptyString),
   providerItemId: Schema.optional(ProviderItemId),
@@ -1258,6 +1290,11 @@ export const OrchestrationEvent = Schema.Union([
     ...EventBaseFields,
     type: Schema.Literal("thread.activity-appended"),
     payload: ThreadActivityAppendedPayload,
+  }),
+  Schema.Struct({
+    ...EventBaseFields,
+    type: Schema.Literal("thread.provider-history-pruned"),
+    payload: ThreadProviderHistoryPrunedPayload,
   }),
 ]);
 export type OrchestrationEvent = typeof OrchestrationEvent.Type;
